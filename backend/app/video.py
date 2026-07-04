@@ -2,6 +2,16 @@ import json
 import subprocess
 
 
+def _run(args: list[str]) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(args, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        raise RuntimeError(
+            f"Command {args!r} failed with exit code {exc.returncode}: {stderr or '(no stderr output)'}"
+        ) from exc
+
+
 def compute_timestamps(
     duration: float,
     interval_seconds: float | None,
@@ -28,31 +38,25 @@ def compute_timestamps(
 
 
 def get_video_duration(url: str) -> float:
-    result = subprocess.run(
-        ["yt-dlp", "--no-warnings", "-j", url],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    result = _run(["yt-dlp", "--no-warnings", "-j", url])
     data = json.loads(result.stdout)
     return float(data["duration"])
 
 
 def download_video(url: str, dest_path: str) -> None:
-    subprocess.run(
+    _run(
         [
             "yt-dlp", "--no-warnings",
             "-f", "bv*+ba/b",
             "--merge-output-format", "mp4",
             "-o", dest_path,
             url,
-        ],
-        check=True,
+        ]
     )
 
 
 def extract_frame(video_path: str, timestamp: float, dest_path: str) -> None:
-    subprocess.run(
+    _run(
         [
             "ffmpeg", "-y",
             "-ss", str(timestamp),
@@ -60,7 +64,5 @@ def extract_frame(video_path: str, timestamp: float, dest_path: str) -> None:
             "-frames:v", "1",
             "-q:v", "3",
             dest_path,
-        ],
-        check=True,
-        capture_output=True,
+        ]
     )
