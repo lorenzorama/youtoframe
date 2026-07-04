@@ -6,6 +6,7 @@ from sqlmodel import Field, SQLModel, JSON, Column
 
 
 class JobStatus(str, Enum):
+    waiting = "waiting"
     pending = "pending"
     downloading = "downloading"
     extracting = "extracting"
