@@ -168,21 +168,26 @@ export default function JobGallery({ jobId }: { jobId: number }) {
               <p className="text-sm text-muted">No transcript available for this video.</p>
             </div>
           ) : (
-            <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
-              {transcript!.cues.map((cue, i) => (
-                <li key={i}>
-                  <button
-                    onClick={() => openNearestFrame(cue.start_seconds)}
-                    className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface"
-                  >
-                    <span className="mt-0.5 shrink-0 font-mono text-xs text-muted">
-                      {formatTime(cue.start_seconds)}
-                    </span>
-                    <span className="text-sm text-ink">{cue.text}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <div>
+              {transcript!.source === "whisper" && (
+                <p className="mb-2 text-xs text-muted">Auto-transcribed</p>
+              )}
+              <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+                {transcript!.cues.map((cue, i) => (
+                  <li key={i}>
+                    <button
+                      onClick={() => openNearestFrame(cue.start_seconds)}
+                      className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface"
+                    >
+                      <span className="mt-0.5 shrink-0 font-mono text-xs text-muted">
+                        {formatTime(cue.start_seconds)}
+                      </span>
+                      <span className="text-sm text-ink">{cue.text}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       )}

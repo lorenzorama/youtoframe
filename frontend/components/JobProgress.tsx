@@ -61,7 +61,9 @@ export default function JobProgress({ jobId, onDone }: { jobId: number; onDone: 
   return (
     <div className="rounded-2xl border border-line bg-white p-5">
       <div className="mb-3 flex items-center justify-between text-sm">
-        <span className="font-medium capitalize text-ink">{event.status}…</span>
+        <span className="font-medium text-ink">
+          {event.status === "transcribing" ? "Transcribing audio…" : `${event.status}…`}
+        </span>
         <span className="text-muted">
           {event.frames_done} / {event.frames_total} frames
         </span>

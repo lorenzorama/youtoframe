@@ -4,6 +4,7 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "bg-chip text-muted",
   downloading: "bg-blue-50 text-blue-700",
   extracting: "bg-blue-50 text-blue-700",
+  transcribing: "bg-blue-50 text-blue-700",
   done: "bg-green-50 text-green-700",
   failed: "bg-red-50 text-red-700",
 };

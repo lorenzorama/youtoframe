@@ -45,6 +45,7 @@ export interface TranscriptCue {
 
 export interface Transcript {
   language: string | null;
+  source: string | null;
   cues: TranscriptCue[];
 }
 
