@@ -40,6 +40,21 @@ class JobResponse(BaseModel):
 class FrameResponse(BaseModel):
     id: int
     timestamp_seconds: float
+    caption: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class TranscriptCueResponse(BaseModel):
+    start_seconds: float
+    end_seconds: float
+    text: str
+
+    class Config:
+        from_attributes = True
+
+
+class TranscriptResponse(BaseModel):
+    language: Optional[str] = None
+    cues: list[TranscriptCueResponse]

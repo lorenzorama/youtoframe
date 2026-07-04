@@ -10,8 +10,8 @@ from sqlmodel import Session, select
 
 from app.database import engine, get_session
 from app.dependencies import get_current_user
-from app.models import Frame, Job, User
-from app.schemas import FrameResponse, JobCreateRequest, JobResponse
+from app.models import Frame, Job, TranscriptCue, User
+from app.schemas import FrameResponse, JobCreateRequest, JobResponse, TranscriptResponse
 from app.security import decode_access_token
 from app.tasks import process_job
 
@@ -97,6 +97,15 @@ def list_frames(job_id: int, session: Session = Depends(get_session), user: User
     return frames
 
 
+@router.get("/{job_id}/transcript", response_model=TranscriptResponse)
+def get_transcript(job_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    job = _get_owned_job(job_id, session, user)
+    cues = session.exec(
+        select(TranscriptCue).where(TranscriptCue.job_id == job_id).order_by(TranscriptCue.start_seconds)
+    ).all()
+    return TranscriptResponse(language=job.transcript_language, cues=cues)
+
+
 @router.get("/{job_id}/zip")
 def download_zip(job_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     _get_owned_job(job_id, session, user)
@@ -106,6 +115,19 @@ def download_zip(job_id: int, session: Session = Depends(get_session), user: Use
     with zipfile.ZipFile(buffer, "w") as zf:
         for frame in frames:
             zf.write(frame.file_path, arcname=f"{frame.timestamp_seconds}.jpg")
+
+    cues = session.exec(
+        select(TranscriptCue).where(TranscriptCue.job_id == job_id).order_by(TranscriptCue.start_seconds)
+    ).all()
+    if cues:
+        def _fmt(sec: float) -> str:
+            total = int(sec)
+            return f"{total // 60}:{total % 60:02d}"
+
+        transcript_text = "\n".join(f"[{_fmt(c.start_seconds)}] {c.text}" for c in cues)
+        with zipfile.ZipFile(buffer, "a") as zf:
+            zf.writestr("transcript.txt", transcript_text)
+
     buffer.seek(0)
 
     return StreamingResponse(

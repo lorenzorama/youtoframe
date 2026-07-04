@@ -23,7 +23,7 @@ def test_list_frames_for_job(mock_task, client, session):
 
     resp = client.get(f"/jobs/{job['id']}/frames", headers=headers)
     assert resp.status_code == 200
-    assert resp.json() == [{"id": frame.id, "timestamp_seconds": 5.0}]
+    assert resp.json() == [{"id": frame.id, "timestamp_seconds": 5.0, "caption": None}]
 
 
 @patch("app.routers.jobs.process_job")
