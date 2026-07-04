@@ -5,7 +5,7 @@ const STATUS_STYLES: Record<string, string> = {
   downloading: "bg-blue-50 text-blue-700",
   extracting: "bg-blue-50 text-blue-700",
   done: "bg-green-50 text-green-700",
-  failed: "bg-red-50 text-brand",
+  failed: "bg-red-50 text-red-700",
 };
 
 export default function StatusBadge({ status }: { status: string }) {

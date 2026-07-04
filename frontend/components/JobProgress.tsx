@@ -45,7 +45,7 @@ export default function JobProgress({ jobId, onDone }: { jobId: number; onDone: 
   if (event.status === "failed") {
     return (
       <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-        <p className="mb-2 text-sm font-semibold text-brand">Extraction failed</p>
+        <p className="mb-2 text-sm font-semibold text-red-700">Extraction failed</p>
         <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white/70 p-3 font-mono text-xs text-ink">
           {event.error}
         </pre>

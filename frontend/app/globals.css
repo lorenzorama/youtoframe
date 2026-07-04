@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
-/* YouTube-inspired light theme. Design tokens are exposed as Tailwind
+/* Neutral minimalist light theme. Design tokens are exposed as Tailwind
    utilities (bg-brand, text-ink, border-line, text-muted, bg-chip, ...)
-   so every component pulls from the same palette. */
+   so every component pulls from the same palette. The primary action
+   color is a neutral near-black (not a platform brand color); functional
+   status colors (green/blue/red) are handled per component. */
 @theme {
-  --color-brand: #ff0000;
-  --color-brand-hover: #cc0000;
+  --color-brand: #0f0f0f;
+  --color-brand-hover: #272727;
   --color-ink: #0f0f0f;
   --color-muted: #606060;
   --color-line: #e5e5e5;

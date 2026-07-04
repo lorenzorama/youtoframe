@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
+import Footer from "@/components/Footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -8,8 +9,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "youtoframe",
-  description: "Extract frames from YouTube videos",
+  title: "Frame Extractor",
+  description: "Extract frames from videos you own or are authorized to use.",
 };
 
 export default function RootLayout({
@@ -19,7 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-white text-ink">{children}</body>
+      <body className="flex min-h-full flex-col bg-white text-ink">
+        {children}
+        <Footer />
+      </body>
     </html>
   );
 }

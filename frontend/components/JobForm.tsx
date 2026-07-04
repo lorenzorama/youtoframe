@@ -71,7 +71,20 @@ export default function JobForm({ onCreated }: { onCreated: (jobId: number) => v
         </div>
       </div>
 
-      {error && <p className="text-sm text-brand">{error}</p>}
+      <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted">
+        <input
+          type="checkbox"
+          required
+          className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+        />
+        <span>
+          I confirm I own this video or am otherwise authorized to extract frames from it, and
+          that doing so complies with the source platform&apos;s Terms of Service and applicable
+          copyright law.
+        </span>
+      </label>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <button
         type="submit"
