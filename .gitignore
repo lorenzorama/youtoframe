@@ -1,3 +1,6 @@
+# Superpowers scratch (brainstorm mockups, SDD progress ledgers)
+.superpowers/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
