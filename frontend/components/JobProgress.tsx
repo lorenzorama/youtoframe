@@ -33,15 +33,38 @@ export default function JobProgress({ jobId, onDone }: { jobId: number; onDone: 
     return () => source.close();
   }, [jobId, onDone]);
 
-  if (!event) return <p>Connecting...</p>;
-
-  if (event.status === "failed") {
-    return <p className="text-red-600">Failed: {event.error}</p>;
+  if (!event) {
+    return <p className="text-sm text-gray-500">Connecting...</p>;
   }
 
+  if (event.status === "failed") {
+    return (
+      <div className="bg-red-50 border border-red-200 text-red-700 rounded px-4 py-3 text-sm">
+        <p className="font-semibold mb-1">Failed</p>
+        <p>{event.error}</p>
+      </div>
+    );
+  }
+
+  const percent =
+    event.frames_total > 0
+      ? Math.min(100, Math.round((event.frames_done / event.frames_total) * 100))
+      : 0;
+
   return (
-    <p>
-      Status: {event.status} — {event.frames_done}/{event.frames_total} frames
-    </p>
+    <div>
+      <div className="flex justify-between items-center mb-2 text-sm text-gray-700">
+        <span className="capitalize">{event.status}&hellip;</span>
+        <span className="text-gray-500">
+          {event.frames_done} / {event.frames_total}
+        </span>
+      </div>
+      <div className="bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div
+          className="bg-indigo-600 h-full rounded-full transition-all"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
   );
 }
