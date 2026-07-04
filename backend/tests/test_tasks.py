@@ -335,3 +335,82 @@ def test_whisper_failure_does_not_fail_job(tmp_path, monkeypatch):
     assert job.transcript_source is None
     frames = session.query(Frame).filter(Frame.job_id == job.id).all()
     assert all(f.caption is None for f in frames)
+
+
+def test_process_job_dispatches_next_on_success(tmp_path, monkeypatch):
+    from app import tasks
+    from unittest.mock import MagicMock
+
+    engine, session = make_session()
+    monkeypatch.setattr(tasks, "engine", engine)
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+    monkeypatch.setattr(tasks, "get_video_info", lambda url: {"duration": 10.0})
+    monkeypatch.setattr(tasks, "download_video", lambda url, path: None)
+    monkeypatch.setattr(tasks, "extract_frame", lambda v, ts, dest: None)
+    monkeypatch.setattr(tasks, "pick_caption_language", lambda info: None)
+    monkeypatch.setattr("app.config.settings.whisper_enabled", False)
+    dispatch = MagicMock()
+    monkeypatch.setattr(tasks, "dispatch_next", dispatch)
+
+    user = User(email="a@example.com", hashed_password="x")
+    session.add(user); session.commit(); session.refresh(user)
+    job = Job(user_id=user.id, youtube_url="https://youtube.com/watch?v=abc", interval_seconds=5.0)
+    session.add(job); session.commit(); session.refresh(job)
+
+    tasks.process_job(job.id)
+
+    session.refresh(job)
+    assert job.status == JobStatus.done
+    dispatch.assert_called_once_with(user.id)
+
+
+def test_process_job_dispatches_next_on_failure(tmp_path, monkeypatch):
+    from app import tasks
+    from unittest.mock import MagicMock
+
+    engine, session = make_session()
+    monkeypatch.setattr(tasks, "engine", engine)
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+    monkeypatch.setattr(tasks, "get_video_info", lambda url: {"duration": 10.0})
+    monkeypatch.setattr(tasks, "download_video", lambda url, path: (_ for _ in ()).throw(RuntimeError("boom")))
+    dispatch = MagicMock()
+    monkeypatch.setattr(tasks, "dispatch_next", dispatch)
+
+    user = User(email="a@example.com", hashed_password="x")
+    session.add(user); session.commit(); session.refresh(user)
+    job = Job(user_id=user.id, youtube_url="https://youtube.com/watch?v=abc", interval_seconds=5.0)
+    session.add(job); session.commit(); session.refresh(job)
+
+    tasks.process_job(job.id)
+
+    session.refresh(job)
+    assert job.status == JobStatus.failed
+    dispatch.assert_called_once_with(user.id)
+
+
+def test_process_job_dispatch_failure_does_not_crash(tmp_path, monkeypatch):
+    from app import tasks
+
+    engine, session = make_session()
+    monkeypatch.setattr(tasks, "engine", engine)
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+    monkeypatch.setattr(tasks, "get_video_info", lambda url: {"duration": 10.0})
+    monkeypatch.setattr(tasks, "download_video", lambda url, path: None)
+    monkeypatch.setattr(tasks, "extract_frame", lambda v, ts, dest: None)
+    monkeypatch.setattr(tasks, "pick_caption_language", lambda info: None)
+    monkeypatch.setattr("app.config.settings.whisper_enabled", False)
+
+    def boom(uid):
+        raise RuntimeError("dispatch blew up")
+
+    monkeypatch.setattr(tasks, "dispatch_next", boom)
+
+    user = User(email="a@example.com", hashed_password="x")
+    session.add(user); session.commit(); session.refresh(user)
+    job = Job(user_id=user.id, youtube_url="https://youtube.com/watch?v=abc", interval_seconds=5.0)
+    session.add(job); session.commit(); session.refresh(job)
+
+    tasks.process_job(job.id)  # must not raise
+
+    session.refresh(job)
+    assert job.status == JobStatus.done  # job outcome unaffected by dispatch failure
