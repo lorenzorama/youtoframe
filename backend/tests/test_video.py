@@ -1,8 +1,17 @@
+import os
+import re  # noqa: F401  (may already be needed)
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from app.video import get_video_duration, download_video, extract_frame, compute_timestamps
+from app.video import (
+    Cue,
+    get_video_info,
+    pick_caption_language,
+    parse_vtt,
+    caption_for_timestamp,
+)
 
 
 def test_compute_timestamps_interval_only():
@@ -89,3 +98,64 @@ def test_extract_frame_invokes_ffmpeg(mock_run):
     assert "ffmpeg" in args
     assert "-q:v" in args
     assert "3" in args
+
+
+def test_pick_caption_language_prefers_english():
+    info = {"subtitles": {"fr": [{}], "en": [{}]}, "automatic_captions": {}}
+    assert pick_caption_language(info) == "en"
+
+
+def test_pick_caption_language_prefers_english_variant():
+    info = {"subtitles": {}, "automatic_captions": {"es": [{}], "en-US": [{}]}}
+    assert pick_caption_language(info) == "en-US"
+
+
+def test_pick_caption_language_falls_back_to_first_available():
+    info = {"subtitles": {"de": [{}]}, "automatic_captions": {}}
+    assert pick_caption_language(info) == "de"
+
+
+def test_pick_caption_language_none_available():
+    assert pick_caption_language({"subtitles": {}, "automatic_captions": {}}) is None
+    assert pick_caption_language({}) is None
+
+
+def test_parse_vtt_well_formed(tmp_path):
+    vtt = tmp_path / "cap.en.vtt"
+    vtt.write_text(
+        "WEBVTT\n\n"
+        "1\n"
+        "00:00:01.000 --> 00:00:04.000\n"
+        "Hello world\n\n"
+        "2\n"
+        "00:00:04.500 --> 00:00:08.000\n"
+        "Second line\n"
+    )
+    cues = parse_vtt(str(vtt))
+    assert cues == [Cue(1.0, 4.0, "Hello world"), Cue(4.5, 8.0, "Second line")]
+
+
+def test_parse_vtt_strips_tags_and_dedupes_and_handles_cue_settings(tmp_path):
+    vtt = tmp_path / "auto.en.vtt"
+    vtt.write_text(
+        "WEBVTT\n\n"
+        "NOTE this is a note block\n\n"
+        "00:00:01.000 --> 00:00:03.000 align:start position:0%\n"
+        "Hello<00:00:01.500><c> there</c>\n\n"
+        "00:00:03.000 --> 00:00:05.000\n"
+        "Hello there\n\n"
+        "00:00:05.000 --> 00:00:07.000\n"
+        "next\n"
+    )
+    cues = parse_vtt(str(vtt))
+    # tags stripped -> "Hello there"; the immediately-repeated identical line is collapsed
+    assert cues == [Cue(1.0, 3.0, "Hello there"), Cue(5.0, 7.0, "next")]
+
+
+def test_caption_for_timestamp_covering_nearest_and_none():
+    cues = [Cue(1.0, 4.0, "a"), Cue(4.5, 8.0, "b")]
+    assert caption_for_timestamp(cues, 2.0) == "a"        # covered
+    assert caption_for_timestamp(cues, 4.2) == "a"        # gap -> nearest preceding
+    assert caption_for_timestamp(cues, 6.0) == "b"        # covered
+    assert caption_for_timestamp(cues, 0.5) is None       # before first cue
+    assert caption_for_timestamp([], 3.0) is None         # no cues
