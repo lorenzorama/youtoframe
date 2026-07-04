@@ -1,6 +1,6 @@
 import os
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.celery_app import celery_app
 from app.config import settings
@@ -16,6 +16,7 @@ from app.video import (
     parse_vtt,
     caption_for_timestamp,
 )
+from app.whisper import extract_audio, transcribe_audio
 
 
 @celery_app.task(name="process_job")
@@ -60,6 +61,7 @@ def process_job(job_id: int) -> None:
                                 )
                             )
                         job.transcript_language = lang
+                        job.transcript_source = "captions"
                         session.add(job)
                         session.commit()
             except Exception:
@@ -85,6 +87,41 @@ def process_job(job_id: int) -> None:
                 job.frames_done += 1
                 session.add(job)
                 session.commit()
+
+            # Best-effort Whisper fallback: only when no captions were found.
+            if (
+                not cues
+                and settings.whisper_enabled
+                and duration <= settings.whisper_max_duration_seconds
+            ):
+                try:
+                    job.status = JobStatus.transcribing
+                    session.add(job)
+                    session.commit()
+
+                    audio_path = os.path.join(job_dir, "audio.wav")
+                    extract_audio(source_path, audio_path)
+                    wlang, wcues = transcribe_audio(audio_path)
+                    if wcues:
+                        for c in wcues:
+                            session.add(
+                                TranscriptCue(
+                                    job_id=job.id,
+                                    start_seconds=c.start,
+                                    end_seconds=c.end,
+                                    text=c.text,
+                                )
+                            )
+                        job.transcript_language = wlang
+                        job.transcript_source = "whisper"
+                        frames = session.exec(select(Frame).where(Frame.job_id == job.id)).all()
+                        for frame in frames:
+                            frame.caption = caption_for_timestamp(wcues, frame.timestamp_seconds)
+                            session.add(frame)
+                        session.add(job)
+                        session.commit()
+                except Exception:
+                    session.rollback()
 
             job.status = JobStatus.done
             session.add(job)
