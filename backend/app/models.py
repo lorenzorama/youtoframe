@@ -9,6 +9,7 @@ class JobStatus(str, Enum):
     pending = "pending"
     downloading = "downloading"
     extracting = "extracting"
+    transcribing = "transcribing"
     done = "done"
     failed = "failed"
 
@@ -31,6 +32,7 @@ class Job(SQLModel, table=True):
     frames_total: int = Field(default=0)
     frames_done: int = Field(default=0)
     transcript_language: Optional[str] = None
+    transcript_source: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
