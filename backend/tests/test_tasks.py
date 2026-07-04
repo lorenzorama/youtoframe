@@ -69,3 +69,29 @@ def test_process_job_failure_sets_status_failed(mock_duration, mock_download, tm
     session.refresh(job)
     assert job.status == JobStatus.failed
     assert "network error" in job.error_message
+
+
+@patch("app.tasks.os.makedirs", side_effect=OSError("permission denied"))
+def test_process_job_makedirs_failure_sets_status_failed(mock_makedirs, tmp_path, monkeypatch):
+    from app import tasks
+
+    engine, session = make_session()
+    monkeypatch.setattr(tasks, "engine", engine)
+    monkeypatch.setattr("app.config.settings.data_dir", str(tmp_path))
+
+    user = User(email="a@example.com", hashed_password="x")
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    job = Job(user_id=user.id, youtube_url="https://youtube.com/watch?v=bad", interval_seconds=5.0)
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+
+    tasks.process_job(job.id)
+
+    session.refresh(job)
+    assert job.status == JobStatus.failed
+    assert job.error_message
+    assert "permission denied" in job.error_message

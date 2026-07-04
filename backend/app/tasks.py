@@ -16,12 +16,12 @@ def process_job(job_id: int) -> None:
         if not job:
             return
 
-        job_dir = os.path.join(settings.data_dir, str(job.user_id), str(job.id))
-        frames_dir = os.path.join(job_dir, "frames")
-        os.makedirs(frames_dir, exist_ok=True)
-        source_path = os.path.join(job_dir, "source.mp4")
-
         try:
+            job_dir = os.path.join(settings.data_dir, str(job.user_id), str(job.id))
+            frames_dir = os.path.join(job_dir, "frames")
+            os.makedirs(frames_dir, exist_ok=True)
+            source_path = os.path.join(job_dir, "source.mp4")
+
             job.status = JobStatus.downloading
             session.add(job)
             session.commit()
