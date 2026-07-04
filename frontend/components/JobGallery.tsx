@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { listFrames, Frame } from "@/lib/jobs";
+import { listFrames, getTranscript, Frame, Transcript } from "@/lib/jobs";
 import { getToken } from "@/lib/api";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -13,13 +13,18 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+type Tab = "storyboard" | "transcript";
+
 export default function JobGallery({ jobId }: { jobId: number }) {
   const [frames, setFrames] = useState<Frame[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<number, string>>({});
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [tab, setTab] = useState<Tab>("storyboard");
+  const [transcript, setTranscript] = useState<Transcript | null>(null);
 
   useEffect(() => {
     listFrames(jobId).then(setFrames).catch(() => {});
+    getTranscript(jobId).then(setTranscript).catch(() => {});
   }, [jobId]);
 
   useEffect(() => {
@@ -45,7 +50,6 @@ export default function JobGallery({ jobId }: { jobId: number }) {
     };
   }, [frames]);
 
-  // Keyboard controls for the lightbox: Escape to close, arrows to navigate.
   useEffect(() => {
     if (selectedIndex === null) return;
     function onKey(e: KeyboardEvent) {
@@ -81,14 +85,45 @@ export default function JobGallery({ jobId }: { jobId: number }) {
     a.click();
   }
 
+  // Open the frame whose timestamp is closest to a transcript cue's start.
+  function openNearestFrame(startSeconds: number) {
+    if (frames.length === 0) return;
+    let best = 0;
+    let bestDist = Infinity;
+    frames.forEach((f, i) => {
+      const d = Math.abs(f.timestamp_seconds - startSeconds);
+      if (d < bestDist) {
+        bestDist = d;
+        best = i;
+      }
+    });
+    setSelectedIndex(best);
+  }
+
   const selectedFrame = selectedIndex !== null ? frames[selectedIndex] : null;
+  const hasTranscript = !!transcript && transcript.cues.length > 0;
+
+  function tabButton(value: Tab, label: string) {
+    const active = tab === value;
+    return (
+      <button
+        onClick={() => setTab(value)}
+        className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+          active ? "bg-ink text-white" : "text-muted hover:bg-chip"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  }
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-muted">
-          {frames.length} frame{frames.length === 1 ? "" : "s"}
-        </p>
+        <div className="flex gap-2">
+          {tabButton("storyboard", "Storyboard")}
+          {tabButton("transcript", "Transcript")}
+        </div>
         <button
           onClick={downloadZip}
           className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-hover"
@@ -97,28 +132,60 @@ export default function JobGallery({ jobId }: { jobId: number }) {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {frames.map((frame, index) => (
-          <button
-            key={frame.id}
-            onClick={() => setSelectedIndex(index)}
-            className="group relative overflow-hidden rounded-xl border border-line bg-chip"
-          >
-            {imageUrls[frame.id] ? (
-              <img
-                src={imageUrls[frame.id]}
-                alt={`Frame at ${frame.timestamp_seconds}s`}
-                className="aspect-video w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
-              />
-            ) : (
-              <div className="aspect-video w-full animate-pulse bg-chip" />
-            )}
-            <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-white">
-              {formatTime(frame.timestamp_seconds)}
-            </span>
-          </button>
-        ))}
-      </div>
+      {tab === "storyboard" && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {frames.map((frame, index) => (
+            <div key={frame.id} className="flex flex-col gap-1.5">
+              <button
+                onClick={() => setSelectedIndex(index)}
+                className="group relative overflow-hidden rounded-xl border border-line bg-chip"
+              >
+                {imageUrls[frame.id] ? (
+                  <img
+                    src={imageUrls[frame.id]}
+                    alt={`Frame at ${frame.timestamp_seconds}s`}
+                    className="aspect-video w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
+                  />
+                ) : (
+                  <div className="aspect-video w-full animate-pulse bg-chip" />
+                )}
+                <span className="absolute bottom-1.5 right-1.5 rounded bg-black/80 px-1.5 py-0.5 text-[11px] font-medium text-white">
+                  {formatTime(frame.timestamp_seconds)}
+                </span>
+              </button>
+              {frame.caption && (
+                <p className="line-clamp-2 text-xs leading-snug text-muted">{frame.caption}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tab === "transcript" && (
+        <div>
+          {!hasTranscript ? (
+            <div className="rounded-xl border border-dashed border-line px-4 py-10 text-center">
+              <p className="text-sm text-muted">No transcript available for this video.</p>
+            </div>
+          ) : (
+            <ul className="flex flex-col divide-y divide-line rounded-xl border border-line">
+              {transcript!.cues.map((cue, i) => (
+                <li key={i}>
+                  <button
+                    onClick={() => openNearestFrame(cue.start_seconds)}
+                    className="flex w-full items-start gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface"
+                  >
+                    <span className="mt-0.5 shrink-0 font-mono text-xs text-muted">
+                      {formatTime(cue.start_seconds)}
+                    </span>
+                    <span className="text-sm text-ink">{cue.text}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {selectedFrame && selectedIndex !== null && (
         <div
@@ -149,12 +216,15 @@ export default function JobGallery({ jobId }: { jobId: number }) {
             </button>
           )}
 
-          <div className="flex flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
+          <div className="flex max-w-[85vw] flex-col items-center gap-4" onClick={(e) => e.stopPropagation()}>
             <img
               src={imageUrls[selectedFrame.id]}
               alt={`Frame at ${selectedFrame.timestamp_seconds}s`}
-              className="max-h-[75vh] max-w-[85vw] rounded-lg"
+              className="max-h-[70vh] max-w-full rounded-lg"
             />
+            {selectedFrame.caption && (
+              <p className="max-w-2xl text-center text-sm text-white/90">{selectedFrame.caption}</p>
+            )}
             <div className="flex items-center gap-4">
               <span className="text-sm text-white/70">
                 {formatTime(selectedFrame.timestamp_seconds)} · {selectedFrame.timestamp_seconds}s
