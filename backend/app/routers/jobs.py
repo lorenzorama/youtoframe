@@ -1,5 +1,5 @@
-import asyncio
 import json
+import time
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -60,7 +60,7 @@ def get_job(job_id: int, session: Session = Depends(get_session), user: User = D
 async def stream_job(job_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
     _get_owned_job(job_id, session, user)
 
-    async def event_generator():
+    def event_generator():
         while True:
             job = session.get(Job, job_id)
             session.refresh(job)
@@ -73,6 +73,6 @@ async def stream_job(job_id: int, session: Session = Depends(get_session), user:
             yield f"data: {json.dumps(payload)}\n\n"
             if job.status in ("done", "failed"):
                 break
-            await asyncio.sleep(1)
+            time.sleep(1)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
