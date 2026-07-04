@@ -1,4 +1,6 @@
 from pydantic import BaseModel, EmailStr
+from typing import Optional
+from datetime import datetime
 
 
 class SignupRequest(BaseModel):
@@ -14,3 +16,22 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class JobCreateRequest(BaseModel):
+    youtube_url: str
+    interval_seconds: Optional[float] = None
+    manual_timestamps: Optional[list[float]] = None
+
+
+class JobResponse(BaseModel):
+    id: int
+    youtube_url: str
+    status: str
+    error_message: Optional[str] = None
+    frames_total: int
+    frames_done: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -1,0 +1,78 @@
+import asyncio
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from sqlmodel import Session, select
+
+from app.database import get_session
+from app.dependencies import get_current_user
+from app.models import Job, User
+from app.schemas import JobCreateRequest, JobResponse
+from app.tasks import process_job
+
+router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.post("", response_model=JobResponse, status_code=201)
+def create_job(
+    payload: JobCreateRequest,
+    session: Session = Depends(get_session),
+    user: User = Depends(get_current_user),
+):
+    if payload.interval_seconds is None and not payload.manual_timestamps:
+        raise HTTPException(status_code=422, detail="Provide interval_seconds and/or manual_timestamps")
+
+    job = Job(
+        user_id=user.id,
+        youtube_url=payload.youtube_url,
+        interval_seconds=payload.interval_seconds,
+        manual_timestamps=payload.manual_timestamps,
+    )
+    session.add(job)
+    session.commit()
+    session.refresh(job)
+
+    process_job.delay(job.id)
+
+    return job
+
+
+@router.get("", response_model=list[JobResponse])
+def list_jobs(session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    jobs = session.exec(select(Job).where(Job.user_id == user.id).order_by(Job.created_at.desc())).all()
+    return jobs
+
+
+def _get_owned_job(job_id: int, session: Session, user: User) -> Job:
+    job = session.get(Job, job_id)
+    if not job or job.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+@router.get("/{job_id}", response_model=JobResponse)
+def get_job(job_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    return _get_owned_job(job_id, session, user)
+
+
+@router.get("/{job_id}/stream")
+async def stream_job(job_id: int, session: Session = Depends(get_session), user: User = Depends(get_current_user)):
+    _get_owned_job(job_id, session, user)
+
+    async def event_generator():
+        while True:
+            job = session.get(Job, job_id)
+            session.refresh(job)
+            payload = {
+                "status": job.status,
+                "frames_done": job.frames_done,
+                "frames_total": job.frames_total,
+                "error": job.error_message,
+            }
+            yield f"data: {json.dumps(payload)}\n\n"
+            if job.status in ("done", "failed"):
+                break
+            await asyncio.sleep(1)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
