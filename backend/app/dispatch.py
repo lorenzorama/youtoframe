@@ -44,4 +44,32 @@ def dispatch_next(user_id: int) -> None:
         job_id = nxt.id
 
     # Enqueue after the transaction commits (and the advisory lock is released).
-    celery_app.send_task("process_job", args=[job_id])
+    # If enqueuing fails (e.g. the broker is unreachable), the job would be stuck
+    # in `pending` forever — and because `pending` counts as active, the user's
+    # whole queue would wedge. Revert it to `waiting` so a later dispatch retries.
+    try:
+        celery_app.send_task("process_job", args=[job_id])
+    except Exception:
+        _revert_to_waiting(job_id)
+        raise
+
+
+def _revert_to_waiting(job_id: int) -> None:
+    """Best-effort rollback of a promotion whose enqueue failed: move the job
+    back to `waiting` so the next dispatch_next can pick it up again. Re-takes the
+    per-user advisory lock to stay serialized with concurrent dispatchers."""
+    with Session(engine) as session:
+        job = session.get(Job, job_id)
+        if job is None or job.status != JobStatus.pending:
+            return
+        if session.get_bind().dialect.name == "postgresql":
+            session.execute(
+                text("SELECT pg_advisory_xact_lock(:uid)"), {"uid": job.user_id}
+            )
+            # Re-read under the lock in case another dispatcher advanced it.
+            session.refresh(job)
+            if job.status != JobStatus.pending:
+                return
+        job.status = JobStatus.waiting
+        session.add(job)
+        session.commit()

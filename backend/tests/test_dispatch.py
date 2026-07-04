@@ -68,6 +68,31 @@ def test_dispatch_noop_when_user_has_active_job(monkeypatch):
     fake_celery.send_task.assert_not_called()
 
 
+def test_dispatch_reverts_to_waiting_when_enqueue_fails(monkeypatch):
+    import pytest
+
+    from app import dispatch
+
+    engine = make_engine()
+    monkeypatch.setattr(dispatch, "engine", engine)
+    fake_celery = MagicMock()
+    fake_celery.send_task.side_effect = RuntimeError("broker down")
+    monkeypatch.setattr(dispatch, "celery_app", fake_celery)
+
+    with Session(engine) as session:
+        user, jobs = _user_and_jobs(session, [JobStatus.waiting])
+        user_id = user.id
+        job_id = jobs[0].id
+
+    with pytest.raises(RuntimeError):
+        dispatch.dispatch_next(user_id)
+
+    # The failed enqueue must not leave the job stuck in pending (which would
+    # wedge the user's queue); it is reverted so a later dispatch can retry.
+    with Session(engine) as session:
+        assert session.get(Job, job_id).status == JobStatus.waiting
+
+
 def test_dispatch_noop_when_no_waiting(monkeypatch):
     from app import dispatch
 
