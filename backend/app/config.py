@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     jwt_expire_minutes: int = 60 * 24
     data_dir: str = "/data"
     cors_origins: list[str] = ["http://localhost:3000"]
+    whisper_enabled: bool = True
+    whisper_model: str = "base"
+    whisper_max_duration_seconds: int = 3600
+    whisper_compute_type: str = "int8"
 
     model_config = SettingsConfigDict(env_file=".env", env_prefix="YTF_")
 
