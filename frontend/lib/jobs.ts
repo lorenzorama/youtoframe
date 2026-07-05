@@ -14,6 +14,8 @@ export interface CreateJobsInput {
   youtube_urls: string[];
   interval_seconds?: number;
   manual_timestamps?: number[];
+  save_to_output?: boolean;
+  output_subdir?: string;
 }
 
 export async function createJobs(input: CreateJobsInput): Promise<Job[]> {

@@ -13,6 +13,8 @@ export default function JobForm({ onCreated }: { onCreated: (batch: AutoSaveBatc
   const [timestamps, setTimestamps] = useState("");
   const [autoSave, setAutoSave] = useState(false);
   const [supported, setSupported] = useState(false);
+  const [saveToOutput, setSaveToOutput] = useState(false);
+  const [outputSubdir, setOutputSubdir] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,6 +55,8 @@ export default function JobForm({ onCreated }: { onCreated: (batch: AutoSaveBatc
         youtube_urls: urlList,
         interval_seconds: interval ? Number(interval) : undefined,
         manual_timestamps: manual.length ? manual : undefined,
+        save_to_output: saveToOutput,
+        output_subdir: saveToOutput && outputSubdir.trim() ? outputSubdir.trim() : undefined,
       });
       setUrls("");
       onCreated({ jobs, dirHandle });
@@ -111,6 +115,29 @@ export default function JobForm({ onCreated }: { onCreated: (batch: AutoSaveBatc
           Tip: auto-saving results straight to a folder is available in Chrome or Edge.
         </p>
       )}
+
+      <div className="flex flex-col gap-2">
+        <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted">
+          <input
+            type="checkbox"
+            checked={saveToOutput}
+            onChange={(e) => setSaveToOutput(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+          />
+          <span>
+            Also save finished results to the server output folder (set by
+            <code className="mx-1">OUTPUT_DIR</code>). Works without keeping this tab open.
+          </span>
+        </label>
+        {saveToOutput && (
+          <input
+            placeholder="Subfolder (optional), e.g. my-project"
+            value={outputSubdir}
+            onChange={(e) => setOutputSubdir(e.target.value)}
+            className={`${fieldClass} ml-7 w-auto`}
+          />
+        )}
+      </div>
 
       <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted">
         <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-ink" />
