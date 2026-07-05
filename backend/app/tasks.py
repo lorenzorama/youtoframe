@@ -7,6 +7,7 @@ from app.config import settings
 from app.database import engine
 from app.dispatch import dispatch_next
 from app.models import Job, Frame, JobStatus, TranscriptCue
+from app.output_save import maybe_save_output
 from app.video import (
     get_video_info,
     download_video,
@@ -130,6 +131,10 @@ def process_job(job_id: int) -> None:
                 job.status = JobStatus.done
                 session.add(job)
                 session.commit()
+                # Best-effort: write the result zip to the output folder if opted
+                # in. maybe_save_output swallows its own errors and returns None,
+                # so it can never flip the just-finished job to failed.
+                maybe_save_output(session, job, settings.output_dir)
             except Exception as exc:
                 job.status = JobStatus.failed
                 job.error_message = str(exc)
