@@ -71,6 +71,7 @@ export default function HomePage() {
   }, [router, reload]);
 
   function handleCreated(batch: AutoSaveBatch) {
+    setAutoSaveError(null); // clear any stale error from a previous batch
     const dir = batch.dirHandle;
     if (dir) {
       batch.jobs.forEach((job, i) => {
