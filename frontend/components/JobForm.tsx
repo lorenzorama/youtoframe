@@ -1,17 +1,26 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createJobs } from "@/lib/jobs";
+import { isAutoSaveSupported, pickDirectory, AutoSaveBatch } from "@/lib/autosave";
 
 const fieldClass =
   "w-full rounded-lg border border-line px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted focus:border-ink";
 
-export default function JobForm({ onCreated }: { onCreated: () => void }) {
+export default function JobForm({ onCreated }: { onCreated: (batch: AutoSaveBatch) => void }) {
   const [urls, setUrls] = useState("");
   const [interval, setInterval_] = useState("5");
   const [timestamps, setTimestamps] = useState("");
+  const [autoSave, setAutoSave] = useState(false);
+  const [supported, setSupported] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Feature-detect on the client only (avoids SSR/CSR hydration mismatch).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSupported(isAutoSaveSupported());
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,13 +37,25 @@ export default function JobForm({ onCreated }: { onCreated: () => void }) {
         .filter(Boolean)
         .map(Number)
         .filter((n) => !Number.isNaN(n));
-      await createJobs({
+
+      // If auto-save is on, obtain the folder from the submit gesture BEFORE
+      // creating jobs. A cancelled picker aborts the whole submit.
+      let dirHandle = null;
+      if (autoSave && supported) {
+        dirHandle = await pickDirectory();
+        if (!dirHandle) {
+          setError("Folder selection cancelled — nothing was queued.");
+          return;
+        }
+      }
+
+      const jobs = await createJobs({
         youtube_urls: urlList,
         interval_seconds: interval ? Number(interval) : undefined,
         manual_timestamps: manual.length ? manual : undefined,
       });
       setUrls("");
-      onCreated();
+      onCreated({ jobs, dirHandle });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create jobs");
     } finally {
@@ -71,6 +92,25 @@ export default function JobForm({ onCreated }: { onCreated: () => void }) {
           />
         </div>
       </div>
+
+      {supported ? (
+        <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted">
+          <input
+            type="checkbox"
+            checked={autoSave}
+            onChange={(e) => setAutoSave(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
+          />
+          <span>
+            Auto-save each result to a folder — you&apos;ll pick the folder when you submit. Keep
+            this tab open while the jobs run.
+          </span>
+        </label>
+      ) : (
+        <p className="text-xs text-muted">
+          Tip: auto-saving results straight to a folder is available in Chrome or Edge.
+        </p>
+      )}
 
       <label className="flex items-start gap-2.5 text-xs leading-relaxed text-muted">
         <input type="checkbox" required className="mt-0.5 h-4 w-4 shrink-0 accent-ink" />
