@@ -117,14 +117,16 @@ Modified files:
 ## Testing
 
 Consistent with the project's established frontend verification (no test runner
-is present; every prior frontend feature was verified by build + lint + manual
+is present, and this machine runs Node 20, which cannot execute TypeScript
+directly; every prior frontend feature was verified by build + lint + manual
 walkthrough):
 
-- **`resolveZipName` collision logic** — a minimal standalone Node assertion
-  script (no framework added) exercising: no collision → `video_2.zip`; one
-  collision → `video_2 (2).zip`; two collisions → `video_2 (3).zip`. Uses a fake
-  directory handle whose `getFileHandle` throws `NotFoundError` for absent
-  names.
+- **`resolveZipName` collision logic** — verified in the manual walkthrough
+  rather than an automated test (Node 20 can't run a TS assertion script without
+  adding a dependency, which was declined). The walkthrough explicitly exercises:
+  pre-place `video_1.zip` → next save becomes `video_1 (2).zip`; place both
+  `video_1.zip` and `video_1 (2).zip` → next becomes `video_1 (3).zip`. The
+  helper is kept small and pure so the behavior is easy to reason about.
 - **`next build`** passes (TypeScript type-check).
 - **`eslint`** clean.
 - **Manual walkthrough in Chrome:** check the box, submit 3 URLs, pick a folder,
