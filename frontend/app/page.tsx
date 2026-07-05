@@ -23,6 +23,12 @@ export default function HomePage() {
   const savingIds = useRef<Set<number>>(new Set());
 
   const processAutoSaves = useCallback(async (current: Job[]) => {
+    // Reconcile: drop tracking for jobs no longer in the list (e.g. deleted),
+    // so the map can't grow unbounded across a long-lived session.
+    const presentIds = new Set(current.map((j) => j.id));
+    for (const id of pendingSaves.current.keys()) {
+      if (!presentIds.has(id)) pendingSaves.current.delete(id);
+    }
     for (const job of current) {
       const entry = pendingSaves.current.get(job.id);
       if (!entry) continue;
