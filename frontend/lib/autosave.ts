@@ -36,7 +36,7 @@ export function isAutoSaveSupported(): boolean {
 // Opens the native folder chooser. Returns the granted handle, or null if the
 // user dismissed the dialog (AbortError). Any other error propagates.
 export async function pickDirectory(): Promise<DirectoryHandle | null> {
-  if (!window.showDirectoryPicker) return null;
+  if (typeof window === "undefined" || !window.showDirectoryPicker) return null;
   try {
     return await window.showDirectoryPicker({ mode: "readwrite" });
   } catch (err) {
