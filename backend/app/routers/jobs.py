@@ -11,6 +11,7 @@ from app.database import engine, get_session
 from app.dependencies import get_current_user
 from app.dispatch import dispatch_next
 from app.models import Frame, Job, JobStatus, TranscriptCue, User
+from app.output_save import sanitize_output_subdir, InvalidSubdir
 from app.schemas import FrameResponse, JobCreateRequest, JobResponse, TranscriptResponse
 from app.security import decode_access_token
 from app.zipbuilder import build_job_zip_bytes
@@ -32,14 +33,25 @@ def create_jobs(
     if payload.interval_seconds is None and not payload.manual_timestamps:
         raise HTTPException(status_code=422, detail="Provide interval_seconds and/or manual_timestamps")
 
+    if payload.save_to_output:
+        try:
+            output_subdir = sanitize_output_subdir(payload.output_subdir)
+        except InvalidSubdir as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+    else:
+        output_subdir = None
+
     jobs = []
-    for url in urls:
+    for i, url in enumerate(urls):
         job = Job(
             user_id=user.id,
             youtube_url=url,
             interval_seconds=payload.interval_seconds,
             manual_timestamps=payload.manual_timestamps,
             status=JobStatus.waiting,
+            save_to_output=payload.save_to_output,
+            output_subdir=output_subdir if payload.save_to_output else None,
+            output_index=(i + 1) if payload.save_to_output else None,
         )
         session.add(job)
         jobs.append(job)

@@ -22,6 +22,8 @@ class JobCreateRequest(BaseModel):
     youtube_urls: list[str]
     interval_seconds: Optional[float] = None
     manual_timestamps: Optional[list[float]] = None
+    save_to_output: bool = False
+    output_subdir: Optional[str] = None
 
 
 class JobResponse(BaseModel):
@@ -32,6 +34,9 @@ class JobResponse(BaseModel):
     frames_total: int
     frames_done: int
     created_at: datetime
+    save_to_output: bool
+    output_subdir: Optional[str]
+    output_index: Optional[int]
 
     class Config:
         from_attributes = True

@@ -187,3 +187,42 @@ def test_cancel_other_users_job_404(mock_dispatch, client):
 
     resp = client.delete(f"/jobs/{created['id']}", headers=headers_b)
     assert resp.status_code == 404
+
+
+@patch("app.routers.jobs.dispatch_next")
+def test_create_jobs_with_output_save(mock_dispatch, client):
+    headers = signup_and_auth_headers(client)
+    resp = client.post(
+        "/jobs",
+        json={"youtube_urls": ["a", "b"], "interval_seconds": 5,
+              "save_to_output": True, "output_subdir": "proj"},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    jobs = resp.json()
+    assert [j["output_index"] for j in jobs] == [1, 2]
+    assert all(j["save_to_output"] is True for j in jobs)
+    assert all(j["output_subdir"] == "proj" for j in jobs)
+
+
+@patch("app.routers.jobs.dispatch_next")
+def test_create_jobs_output_save_off_by_default(mock_dispatch, client):
+    headers = signup_and_auth_headers(client)
+    resp = client.post("/jobs", json={"youtube_urls": ["a"], "interval_seconds": 5}, headers=headers)
+    assert resp.status_code == 201
+    job = resp.json()[0]
+    assert job["save_to_output"] is False
+    assert job["output_index"] is None
+    assert job["output_subdir"] is None
+
+
+@patch("app.routers.jobs.dispatch_next")
+def test_create_jobs_rejects_bad_subdir(mock_dispatch, client):
+    headers = signup_and_auth_headers(client)
+    resp = client.post(
+        "/jobs",
+        json={"youtube_urls": ["a"], "interval_seconds": 5,
+              "save_to_output": True, "output_subdir": ".."},
+        headers=headers,
+    )
+    assert resp.status_code == 422
